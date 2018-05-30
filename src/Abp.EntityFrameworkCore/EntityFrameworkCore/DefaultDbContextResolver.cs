@@ -6,6 +6,8 @@ using System;
 using System.Data.Common;
 using System.Reflection;
 using JetBrains.Annotations;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using System.Linq;
 
 namespace Abp.EntityFrameworkCore
 {
@@ -28,21 +30,47 @@ namespace Abp.EntityFrameworkCore
             where TDbContext : DbContext
         {
             var dbContextType = typeof(TDbContext);
-
-            if (!dbContextType.IsAbstract)
+            Type concreteType = null;
+            var isAbstractDbContext = dbContextType.GetTypeInfo().IsAbstract;
+            if (isAbstractDbContext)
             {
+                concreteType = _dbContextTypeMatcher.GetConcreteType(dbContextType);
+            }
+
+            try
+            {
+                if (isAbstractDbContext)
+                {
+                    return (TDbContext) _iocResolver.Resolve(concreteType, new
+                    {
+                        options = CreateOptionsForType(concreteType, connectionString, existingConnection)
+                    });
+                }
+
                 return _iocResolver.Resolve<TDbContext>(new
                 {
                     options = CreateOptions<TDbContext>(connectionString, existingConnection)
                 });
             }
-
-            var concreteType = _dbContextTypeMatcher.GetConcreteType(dbContextType);
-
-            return (TDbContext)_iocResolver.Resolve(concreteType, new
+            catch (Castle.MicroKernel.Resolvers.DependencyResolverException ex)
             {
-                options = CreateOptionsForType(concreteType, connectionString, existingConnection)
-            });
+                var hasOptions = isAbstractDbContext ? HasOptions(concreteType) : HasOptions(dbContextType);
+                if (!hasOptions)
+                {
+                    throw new AggregateException($"The parameter name of {dbContextType.Name}'s constructor must be 'options'", ex);
+                }
+
+                throw;
+            }
+
+            bool HasOptions(Type contextType)
+            {
+                return contextType.GetConstructors().Any(ctor =>
+                {
+                    var parameters = ctor.GetParameters();
+                    return parameters.Length == 1 && parameters.FirstOrDefault()?.Name == "options";
+                });
+            }
         }
 
         private object CreateOptionsForType(Type dbContextType, string connectionString, DbConnection existingConnection)
@@ -55,6 +83,7 @@ namespace Abp.EntityFrameworkCore
             if (_iocResolver.IsRegistered<IAbpDbContextConfigurer<TDbContext>>())
             {
                 var configuration = new AbpDbContextConfiguration<TDbContext>(connectionString, existingConnection);
+                ReplaceServices(configuration);
 
                 using (var configurer = _iocResolver.ResolveAsDisposable<IAbpDbContextConfigurer<TDbContext>>())
                 {
@@ -70,6 +99,11 @@ namespace Abp.EntityFrameworkCore
             }
 
             throw new AbpException($"Could not resolve DbContextOptions for {typeof(TDbContext).AssemblyQualifiedName}.");
+        }
+
+        protected virtual void ReplaceServices<TDbContext>(AbpDbContextConfiguration<TDbContext> configuration) where TDbContext : DbContext
+        {
+            configuration.DbContextOptions.ReplaceService<IEntityMaterializerSource, AbpEntityMaterializerSource>();
         }
     }
 }

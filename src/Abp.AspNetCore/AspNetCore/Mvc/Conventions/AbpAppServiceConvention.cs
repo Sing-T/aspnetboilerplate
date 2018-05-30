@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Mvc.ApplicationModels;
 using Microsoft.AspNetCore.Mvc.Internal;
 using Microsoft.Extensions.DependencyInjection;
 using System.Linq;
+using System.Reflection;
 using Abp.Collections.Extensions;
 using Abp.Web.Api.ProxyScripting.Generators;
 using JetBrains.Annotations;
@@ -39,7 +40,7 @@ namespace Abp.AspNetCore.Mvc.Conventions
                 var type = controller.ControllerType.AsType();
                 var configuration = GetControllerSettingOrNull(type);
 
-                if (typeof(IApplicationService).IsAssignableFrom(type))
+                if (typeof(IApplicationService).GetTypeInfo().IsAssignableFrom(type))
                 {
                     controller.ControllerName = controller.ControllerName.RemovePostFix(ApplicationService.CommonPostfixes);
                     configuration?.ControllerModelConfigurer(controller);
@@ -49,7 +50,7 @@ namespace Abp.AspNetCore.Mvc.Conventions
                 }
                 else
                 {
-                    var remoteServiceAtt = ReflectionHelper.GetSingleAttributeOrDefault<RemoteServiceAttribute>(type);
+                    var remoteServiceAtt = ReflectionHelper.GetSingleAttributeOrDefault<RemoteServiceAttribute>(type.GetTypeInfo());
                     if (remoteServiceAtt != null && remoteServiceAtt.IsEnabledFor(type))
                     {
                         ConfigureRemoteService(controller, configuration);
@@ -144,7 +145,7 @@ namespace Abp.AspNetCore.Mvc.Conventions
             if (controller.ApiExplorer.IsVisible == null)
             {
                 var controllerType = controller.ControllerType.AsType();
-                var remoteServiceAtt = ReflectionHelper.GetSingleAttributeOrDefault<RemoteServiceAttribute>(controllerType);
+                var remoteServiceAtt = ReflectionHelper.GetSingleAttributeOrDefault<RemoteServiceAttribute>(controllerType.GetTypeInfo());
                 if (remoteServiceAtt != null)
                 {
                     controller.ApiExplorer.IsVisible =
@@ -197,6 +198,12 @@ namespace Abp.AspNetCore.Mvc.Conventions
         private void ConfigureSelector(string moduleName, string controllerName, ActionModel action, [CanBeNull] AbpControllerAssemblySetting configuration)
         {
             RemoveEmptySelectors(action.Selectors);
+
+            var remoteServiceAtt = ReflectionHelper.GetSingleAttributeOrDefault<RemoteServiceAttribute>(action.ActionMethod);
+            if (remoteServiceAtt != null && !remoteServiceAtt.IsEnabledFor(action.ActionMethod))
+            {
+                return;
+            }
 
             if (!action.Selectors.Any())
             {

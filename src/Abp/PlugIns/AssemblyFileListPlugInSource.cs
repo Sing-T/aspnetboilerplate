@@ -53,7 +53,9 @@ namespace Abp.PlugIns
 
         private List<Assembly> LoadAssemblies()
         {
-            return FilePaths.Select(Assembly.LoadFile).ToList();
+            return FilePaths.Select(
+                Assembly.LoadFile //TODO: Use AssemblyLoadContext.Default.LoadFromAssemblyPath instead?
+            ).ToList();
         }
     }
 }
