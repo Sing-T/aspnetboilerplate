@@ -6,12 +6,15 @@ using Abp.Modules;
 using Abp.AspNetCore.Configuration;
 using Abp.AspNetCore.Mocks;
 using Abp.Auditing;
+using Abp.FluentValidation;
 using Abp.Localization;
 using Abp.MultiTenancy;
+using Abp.Reflection.Extensions;
+using Microsoft.AspNetCore.Builder;
 
 namespace Abp.AspNetCore.App
 {
-    [DependsOn(typeof(AbpAspNetCoreTestBaseModule))]
+    [DependsOn(typeof(AbpAspNetCoreTestBaseModule), typeof(AbpFluentValidationModule))]
     public class AppModule : AbpModule
     {
         public override void PreInitialize()
@@ -24,13 +27,20 @@ namespace Abp.AspNetCore.App
             Configuration
                 .Modules.AbpAspNetCore()
                 .CreateControllersForAppServices(
-                    Assembly.GetExecutingAssembly()
+                    typeof(AppModule).GetAssembly()
                 );
+
+            Configuration.IocManager.Resolve<IAbpAspNetCoreConfiguration>().RouteConfiguration.Add(routes =>
+            {
+                routes.MapRoute(
+                    name: "default",
+                    template: "{controller=Home}/{action=Index}/{id?}");
+            });
         }
 
         public override void Initialize()
         {
-            IocManager.RegisterAssemblyByConvention(Assembly.GetExecutingAssembly());
+            IocManager.RegisterAssemblyByConvention(typeof(AppModule).GetAssembly());
         }
 
         public override void PostInitialize()

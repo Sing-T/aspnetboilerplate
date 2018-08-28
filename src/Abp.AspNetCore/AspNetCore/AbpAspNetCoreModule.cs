@@ -1,5 +1,4 @@
 ﻿using System.Linq;
-using System.Reflection;
 using Abp.AspNetCore.Configuration;
 using Abp.AspNetCore.MultiTenancy;
 using Abp.AspNetCore.Mvc.Auditing;
@@ -9,9 +8,9 @@ using Abp.Auditing;
 using Abp.Configuration.Startup;
 using Abp.Dependency;
 using Abp.Modules;
+using Abp.Reflection.Extensions;
 using Abp.Runtime.Session;
 using Abp.Web;
-using Abp.Web.MultiTenancy;
 using Abp.Web.Security.AntiForgery;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Http;
@@ -25,6 +24,8 @@ namespace Abp.AspNetCore
     {
         public override void PreInitialize()
         {
+            IocManager.AddConventionalRegistrar(new AbpAspNetCoreConventionalRegistrar());
+
             IocManager.Register<IAbpAspNetCoreConfiguration, AbpAspNetCoreConfiguration>();
 
             Configuration.ReplaceService<IPrincipalAccessor, AspNetCorePrincipalAccessor>(DependencyLifeStyle.Transient);
@@ -40,7 +41,7 @@ namespace Abp.AspNetCore
 
         public override void Initialize()
         {
-            IocManager.RegisterAssemblyByConvention(Assembly.GetExecutingAssembly());
+            IocManager.RegisterAssemblyByConvention(typeof(AbpAspNetCoreModule).GetAssembly());
         }
 
         public override void PostInitialize()

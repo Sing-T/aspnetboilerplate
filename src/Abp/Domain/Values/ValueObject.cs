@@ -1,5 +1,7 @@
-﻿using System;
+﻿using Abp.Reflection;
+using System;
 using System.Linq;
+using System.Reflection;
 
 namespace Abp.Domain.Values
 {
@@ -18,7 +20,7 @@ namespace Abp.Domain.Values
                 return false;
             }
 
-            var publicProperties = GetType().GetProperties();
+            var publicProperties = GetPropertiesForCompare();
             if (!publicProperties.Any())
             {
                 return true;
@@ -44,7 +46,7 @@ namespace Abp.Domain.Values
             const int index = 1;
             const int initialHasCode = 31;
 
-            var publicProperties = GetType().GetProperties();
+            var publicProperties = GetPropertiesForCompare();
 
             if (!publicProperties.Any())
             {
@@ -90,6 +92,11 @@ namespace Abp.Domain.Values
         public static bool operator !=(ValueObject<TValueObject> x, ValueObject<TValueObject> y)
         {
             return !(x == y);
+        }
+
+        private PropertyInfo[] GetPropertiesForCompare()
+        {
+            return GetType().GetTypeInfo().GetProperties().Where(t => ReflectionHelper.GetSingleAttributeOrDefault<IgnoreOnCompareAttribute>(t) == null).ToArray();
         }
     }
 }

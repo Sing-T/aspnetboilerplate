@@ -16,10 +16,12 @@ using Abp.Events.Bus.Exceptions;
 using Abp.Localization;
 using Abp.Localization.Sources;
 using Abp.Logging;
+using Abp.ObjectMapping;
 using Abp.Reflection;
 using Abp.Runtime.Session;
 using Abp.Runtime.Validation;
 using Abp.Web.Models;
+using Abp.Web.Mvc.Alerts;
 using Abp.Web.Mvc.Configuration;
 using Abp.Web.Mvc.Controllers.Results;
 using Abp.Web.Mvc.Extensions;
@@ -106,12 +108,22 @@ namespace Abp.Web.Mvc.Controllers
                 return _localizationSource;
             }
         }
+
+        public IAlertManager AlertManager { get; set; }
+
+        public AlertList Alerts => AlertManager.Alerts;
+
         private ILocalizationSource _localizationSource;
 
         /// <summary>
         /// Reference to the logger to write logs.
         /// </summary>
         public ILogger Logger { get; set; }
+
+        /// <summary>
+        /// Reference to the object to object mapper.
+        /// </summary>
+        public IObjectMapper ObjectMapper { get; set; }
 
         /// <summary>
         /// Reference to <see cref="IUnitOfWorkManager"/>.
@@ -158,6 +170,7 @@ namespace Abp.Web.Mvc.Controllers
             LocalizationManager = NullLocalizationManager.Instance;
             PermissionChecker = NullPermissionChecker.Instance;
             EventBus = NullEventBus.Instance;
+            ObjectMapper = NullObjectMapper.Instance;
         }
 
         /// <summary>

@@ -1,7 +1,6 @@
 ﻿using System;
 using System.IO;
 using System.Linq.Expressions;
-using System.Reflection;
 using Abp.Application.Features;
 using Abp.Application.Navigation;
 using Abp.Application.Services;
@@ -13,6 +12,7 @@ using Abp.Configuration;
 using Abp.Configuration.Startup;
 using Abp.Dependency;
 using Abp.Domain.Uow;
+using Abp.EntityHistory;
 using Abp.Events.Bus;
 using Abp.Localization;
 using Abp.Localization.Dictionaries;
@@ -21,6 +21,8 @@ using Abp.Modules;
 using Abp.MultiTenancy;
 using Abp.Net.Mail;
 using Abp.Notifications;
+using Abp.RealTime;
+using Abp.Reflection.Extensions;
 using Abp.Runtime;
 using Abp.Runtime.Caching;
 using Abp.Runtime.Remoting;
@@ -45,14 +47,13 @@ namespace Abp
             IocManager.Register<IScopedIocResolver, ScopedIocResolver>(DependencyLifeStyle.Transient);
             IocManager.Register(typeof(IAmbientScopeProvider<>), typeof(DataContextAmbientScopeProvider<>), DependencyLifeStyle.Transient);
 
-            InitializeInterceptors();
-
             AddAuditingSelectors();
             AddLocalizationSources();
             AddSettingProviders();
             AddUnitOfWorkFilters();
             ConfigureCaches();
             AddIgnoredTypes();
+            AddMethodParameterValidators();
         }
 
         public override void Initialize()
@@ -64,7 +65,9 @@ namespace Abp
 
             IocManager.IocContainer.Install(new EventBusInstaller(IocManager));
 
-            IocManager.RegisterAssemblyByConvention(Assembly.GetExecutingAssembly(),
+            IocManager.Register(typeof(IOnlineClientManager<>), typeof(OnlineClientManager<>), DependencyLifeStyle.Singleton);
+
+            IocManager.RegisterAssemblyByConvention(typeof(AbpKernelModule).GetAssembly(),
                 new ConventionalRegistrationConfig
                 {
                     InstallInstallers = false
@@ -98,14 +101,6 @@ namespace Abp
             }
         }
 
-        private void InitializeInterceptors()
-        {
-            ValidationInterceptorRegistrar.Initialize(IocManager);
-            AuditingInterceptorRegistrar.Initialize(IocManager);
-            UnitOfWorkRegistrar.Initialize(IocManager);
-            AuthorizationInterceptorRegistrar.Initialize(IocManager);
-        }
-
         private void AddUnitOfWorkFilters()
         {
             Configuration.UnitOfWork.RegisterFilter(AbpDataFilters.SoftDelete, true);
@@ -137,7 +132,7 @@ namespace Abp
                 new DictionaryBasedLocalizationSource(
                     AbpConsts.LocalizationSourceName,
                     new XmlEmbeddedFileLocalizationDictionaryProvider(
-                        Assembly.GetExecutingAssembly(), "Abp.Localization.Sources.AbpXmlSource"
+                        typeof(AbpKernelModule).GetAssembly(), "Abp.Localization.Sources.AbpXmlSource"
                     )));
         }
 
@@ -180,6 +175,13 @@ namespace Abp
             }
         }
 
+        private void AddMethodParameterValidators()
+        {
+            Configuration.Validation.Validators.Add<DataAnnotationsValidator>();
+            Configuration.Validation.Validators.Add<ValidatableObjectValidator>();
+            Configuration.Validation.Validators.Add<CustomValidator>();
+        }
+
         private void RegisterMissingComponents()
         {
             if (!IocManager.IsRegistered<IGuidGenerator>())
@@ -200,6 +202,7 @@ namespace Abp
             IocManager.RegisterIfNot<IClientInfoProvider, NullClientInfoProvider>(DependencyLifeStyle.Singleton);
             IocManager.RegisterIfNot<ITenantStore, NullTenantStore>(DependencyLifeStyle.Singleton);
             IocManager.RegisterIfNot<ITenantResolverCache, NullTenantResolverCache>(DependencyLifeStyle.Singleton);
+            IocManager.RegisterIfNot<IEntityHistoryStore, NullEntityHistoryStore>(DependencyLifeStyle.Singleton);
 
             if (Configuration.BackgroundJobs.IsJobExecutionEnabled)
             {

@@ -14,6 +14,7 @@ namespace Abp.PlugIns
         {
             PlugInSources = new PlugInSourceList();
 
+            //TODO: Try to use AssemblyLoadContext.Default..?
             RegisterToAssemblyResolve(PlugInSources);
         }
 
